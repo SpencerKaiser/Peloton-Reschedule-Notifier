@@ -11,7 +11,7 @@ Assuming you have Node.js installed, simply run `npm i` to install dependencies
 You must have the following if you intend to use this app:
 
 - A reschedule URL sent from Peloton (likely via email and via text)
-- A Slack Incoming Webhook URL (set one up [here](https://americanairlines.slack.com/apps/A0F7XDUAZ-incoming-webhooks))
+- A Slack Incoming Webhook URL (set one up [here](https://americanairlines.slack.com/apps/A0F7XDUAZ-incoming-webhooks); search for yourself in the channel dropdown)
 
 ## Running the App
 
