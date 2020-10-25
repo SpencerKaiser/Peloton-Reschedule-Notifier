@@ -9,7 +9,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "cron": "^1.8.2",
     "dotenv": "^8.2.0",
+    "jsdom": "^16.4.0",
     "node-fetch": "^2.6.1"
   }
 }

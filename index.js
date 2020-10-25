@@ -1,8 +1,8 @@
 require("dotenv").config();
 const fetch = require("node-fetch");
+const CronJob = require("cron").CronJob;
 
-const minutesBetweenQueries = 5;
-const soonestDelivery = new Date(process.CURRENT_DELIVERY_DATE);
+const currentDeliveryDate = new Date(process.env.CURRENT_DELIVERY_DATE);
 const deliveryId = process.env.DELIVERY_ID;
 
 const pelotonApiUrl = "https://graph.prod.k8s.onepeloton.com/graphql";
@@ -15,13 +15,50 @@ const query = {
 const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL;
 const rescheduleUrl = `https://www.onepeloton.com/delivery/${deliveryId}/reschedule`;
 
-// TODO: Remove this
+// TODO: Remove this after implementing cookie refresh
 const cookie = process.env.COOKIE;
 
-evaluateEarliestDeliveryDate();
-setInterval(evaluateEarliestDeliveryDate, minutesBetweenQueries * 60 * 1000);
+// Query immediately and on the 55th minute of every other hour
+new CronJob(
+  "55 */2 * * *",
+  async function () {
+    try {
+      await refreshCookie();
 
-async function evaluateEarliestDeliveryDate() {
+      await sendUpdateToSlack("Still querying, no new delivery times.");
+    } catch (err) {
+      console.log("Unable to refresh Peloton API cookie: ", err);
+    }
+  },
+  null,
+  true,
+  null,
+  null,
+  true
+);
+
+// Query immediately and then every 10th minute
+new CronJob(
+  "*/10 * * * *",
+  async function () {
+    try {
+      await evaluateEarliestDeliveryDate();
+    } catch (err) {
+      console.log("Unable to complete query to Peloton API: ", err);
+    }
+  },
+  null,
+  true,
+  null,
+  null,
+  true
+);
+
+async function refreshCookie() {
+  // TODO: Implement cookie (if necessary)
+}
+
+async function evaluateEarliestDeliveryDate(retry = true) {
   console.log("Making request to Peloton's API...");
   const response = await fetch(pelotonApiUrl, {
     method: "POST",
@@ -41,15 +78,25 @@ async function evaluateEarliestDeliveryDate() {
 
   const data = await response.json();
   const earliestDelivery = data.data.order.availableDeliveries[0];
+  if (!earliestDelivery && retry) {
+    return evaluateEarliestDeliveryDate(false);
+  } else if (!earliestDelivery) {
+    await sendUpdateToSlack(
+      "Peloton did not return delivery times after 2 attempts... we'll try again in 10 minutes."
+    );
+    return;
+  }
   const earliestDeliveryDate = new Date(earliestDelivery.date);
 
-  if (earliestDeliveryDate < soonestDelivery) {
+  if (earliestDeliveryDate < currentDeliveryDate) {
     sendUpdateToSlack(
       `A new delivery date was posted!!! Hurry and <${rescheduleUrl}|reschedule>!`
     );
     console.log("A new delivery date was posted!!!");
   } else {
-    console.log("No luck... checking again in 5 minutes 😓");
+    console.log(
+      `No luck... earliest delivery is on ${earliestDelivery.date}. Checking again in 10 minutes 😓`
+    );
   }
 }
 
